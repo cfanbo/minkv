@@ -1,0 +1,21 @@
+[package]
+name = "minkv"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.38"
+crc32fast = "1.4.2"
+env_logger = "0.11.5"
+log = "0.4.22"
+serde = { version = "1.0.204", features = ["derive"] }
+# dashmap = "5.0"
+fs4 = { version = "0.9", features = ["sync"] }
+rand = "0.8.5"
+regex = "1.10.6"
+toml = "0.8.19"
+anyhow = "1.0.86"
+tempfile = "3.12.0"
+clap = { version = "4.5.10", features = ["derive"] }
+redis-protocol = { version = "5.0.1", features = ["std", "codec"] }
+fs2 = "0.4.3"

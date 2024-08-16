@@ -1,0 +1,11 @@
+file_max_size = 10240000
+db_dir = "./dbdata"
+file = "mysql"
+merge_file_num = 2
+
+# 当更新一定数量时刷新
+sync_keys = 5
+
+[server]
+address = '127.0.0.1'
+port = 6381

@@ -1,0 +1,13 @@
+/target
+*.txt
+*.bin
+**/*.rs.bk
+*.pdb
+Cargo.lock
+debug/
+target/
+settings.json
+/.zed
+dbdata
+.DS_Store
+lock
