@@ -805,7 +805,7 @@ impl Server {
                 if let OwnedFrame::Array(arr) = frame {
                     if arr.len() != 2 {
                         return Err(
-                            "(error) ERR wrong number of arguments for 'key' command".to_string()
+                            "(error) ERR wrong number of arguments for 'keys' command".to_string()
                         );
                     }
 
