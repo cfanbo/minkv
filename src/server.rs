@@ -828,6 +828,26 @@ impl Server {
                     Err("Invalid KEYS command format".to_string())
                 }
             }
+            "PING" => {
+                if let OwnedFrame::Array(arr) = frame {
+                    if arr.len() == 1 {
+                        return Ok(OwnedFrame::SimpleString(b"PONG".to_vec()));
+                    }
+                    if arr.len() != 2 {
+                        return Err(
+                            "(error) ERR wrong number of arguments for 'ping' command".to_string()
+                        );
+                    }
+                    let key = match &arr[2] {
+                        OwnedFrame::BulkString(bulk) => bulk,
+                        _ => return Err("Invalid PING command format".to_string()),
+                    };
+
+                    return Ok(OwnedFrame::BulkString(key.to_vec()));
+                } else {
+                    Err("Invalid PING command format".to_string())
+                }
+            }
             // 其他命令处理
             _ => Err(format!("Unsupported command {:?}", command.as_str()).to_string()),
         }
