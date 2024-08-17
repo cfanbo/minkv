@@ -59,3 +59,21 @@ jobs:
           zip: windows
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  finish_release:
+    needs: upload-assets
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+      ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          ref: ${{github.ref}}
+      - name: Download assets and upload assets to aliyun oss
+        run: |
+          TAG=${{ github.ref_name }}
+          VERSION=${TAG#v}
+          bash tools/upload_assets.sh ${VERSION}
