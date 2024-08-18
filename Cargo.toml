@@ -19,3 +19,7 @@ tempfile = "3.12.0"
 clap = { version = "4.5.10", features = ["derive"] }
 redis-protocol = { version = "5.0.1", features = ["std", "codec"] }
 fs2 = "0.4.3"
+
+[build-dependencies]
+anyhow = "1.0.86"
+vergen-git2 = "1.0.0"

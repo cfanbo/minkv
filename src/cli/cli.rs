@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(arg_required_else_help = true)]
-#[command(version, about, long_about = None)]
+#[command(version, version=option_env!("VERGEN_GIT_DESCRIBE").unwrap_or("unknown"), about, long_about = None)]
 struct Cli {
     /// Sets a custom config file
     #[arg(short, long, value_name = "FILE")]
@@ -31,9 +31,7 @@ pub fn parse() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Serve { config }) => {
-            server::start_server(config)
-        }
-        None => Ok(())
+        Some(Commands::Serve { config }) => server::start_server(config),
+        None => Ok(()),
     }
 }
