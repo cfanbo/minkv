@@ -32,10 +32,10 @@ cat ./SHASUMS256.txt
 
 # install aliyun script
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/aliyun/aliyun-cli/HEAD/install.sh)"
-aliyun configure --profile default
 
 # upload assets
 FLAGS="${BUCKET}/ --force --access-key-id ${ACCESS_KEY_ID} --access-key-secret ${ACCESS_KEY_SECRET} --region cn-shanghai"
+echo $LFLAGS
 for filename in "${LIST[@]}"
 do
     aliyun oss cp $filename $FLAGS
