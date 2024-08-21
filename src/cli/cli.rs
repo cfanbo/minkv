@@ -25,13 +25,13 @@ enum Commands {
     },
 }
 
-pub fn parse() -> anyhow::Result<()> {
+pub async fn parse() -> anyhow::Result<()> {
     env_logger::init();
 
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Serve { config }) => server::start_server(config),
+        Some(Commands::Serve { config }) => server::start_server(config).await,
         None => Ok(()),
     }
 }

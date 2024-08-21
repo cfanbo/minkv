@@ -1,7 +1,9 @@
+use anyhow::Result;
 use regex::Regex;
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
 use std::net::IpAddr;
+use std::net::SocketAddr;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -15,6 +17,7 @@ struct FileConfig {
     sync_keys: Option<u32>,
     merge_file_num: Option<u32>,
     server: Option<FileConfigServer>,
+    grpc: Option<FileConfigServer>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,6 +59,28 @@ impl TryFrom<&Path> for FileConfig {
             }
         }
 
+        if let Some(server) = &config.grpc {
+            if let Some(address) = &server.address {
+                if !address.parse::<IpAddr>().is_ok() {
+                    return Err(Error::new(
+                        ErrorKind::AddrNotAvailable,
+                        "server address invalid".to_string(),
+                    )
+                    .into());
+                }
+            }
+
+            if let Some(port) = server.port {
+                if port < 1 || port > 65535 {
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        format!("invalid port {}", port).to_string(),
+                    )
+                    .into());
+                }
+            }
+        }
+
         Ok(config)
     }
 }
@@ -68,11 +93,26 @@ pub struct Config {
     sync_keys: u32,
     server: ConfigServer,
     merge_file_num: usize,
+    grpc: Option<ConfigServer>,
 }
-#[derive(Debug, Deserialize, Clone)]
-struct ConfigServer {
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct ConfigServer {
     address: String,
     port: u32,
+}
+
+impl ConfigServer {
+    pub fn get_addr(&self) -> anyhow::Result<SocketAddr> {
+        let addr_str = format!("{}:{}", self.address, self.port);
+
+        match addr_str.parse::<SocketAddr>() {
+            Ok(addr) => Ok(addr),
+            Err(e) => Err(anyhow::Error::msg(format!(
+                "Failed to parse address: {}",
+                e
+            ))),
+        }
+    }
 }
 
 impl Default for Config {
@@ -86,6 +126,7 @@ impl Default for Config {
                 address: "127.0.0.1".to_string(),
                 port: 6380,
             },
+            grpc: None,
             merge_file_num: 10,
         }
     }
@@ -126,6 +167,17 @@ impl TryFrom<&Path> for Config {
             }
         }
 
+        if let Some(server) = config.grpc {
+            let mut config = ConfigServer::default();
+            if let Some(server_address) = server.address {
+                config.address = server_address
+            }
+            if let Some(server_port) = server.port {
+                config.port = server_port
+            }
+            default_config.grpc = Some(config);
+        }
+
         default_config.check()?;
 
         Ok(default_config)
@@ -164,8 +216,8 @@ impl Config {
         Ok(())
     }
 
-    pub fn get_addr_port(&self) -> (String, u32) {
-        (self.server.address.clone(), self.server.port)
+    pub fn get_addr(&self) -> Result<SocketAddr> {
+        self.server.get_addr()
     }
 
     pub fn merge_cleanup(&self) {
@@ -258,6 +310,10 @@ impl Config {
 
     pub fn get_sync_keys_num(&self) -> u32 {
         self.sync_keys
+    }
+
+    pub fn get_grpc(&self) -> &Option<ConfigServer> {
+        &self.grpc
     }
 }
 

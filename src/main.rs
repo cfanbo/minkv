@@ -10,8 +10,9 @@ struct Record {
     age: u8,
 }
 
-fn main() {
-    match cli::cli::parse() {
+#[tokio::main]
+async fn main() {
+    match cli::cli::parse().await {
         Ok(_) => {}
         Err(e) => {
             debug!("{:?}", e);

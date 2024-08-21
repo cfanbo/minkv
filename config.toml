@@ -9,3 +9,6 @@ sync_keys = 5
 [server]
 address = '127.0.0.1'
 port = 6381
+[grpc]
+address = "127.0.0.1"
+port = 8888

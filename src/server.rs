@@ -1,5 +1,7 @@
 use super::config;
+use super::grpc_server::StoreImpl;
 use crate::db_store;
+use crate::grpc_server::grpc_minkv::store_server::StoreServer;
 use crate::util;
 use log::*;
 use redis_protocol::resp2::{
@@ -7,6 +9,7 @@ use redis_protocol::resp2::{
     encode::encode,
     types::{OwnedFrame, Resp2Frame},
 };
+use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -15,23 +18,16 @@ use std::{
     io::{Read, Write},
     sync::RwLock,
 };
+use tokio::task::JoinSet;
 
 pub struct Server {
-    config: config::Config,
+    config: Arc<config::Config>,
     store: Arc<RwLock<dyn db_store::Op>>,
 }
 
 impl Server {
-    pub fn new(config: config::Config) -> Server {
-        let (tx, rx) = mpsc::channel();
-        let srv_config = config.clone();
-        let config = Arc::new(config);
-        let store = db_store::new_store(config, tx, rx);
-
-        Server {
-            config: srv_config,
-            store: Arc::new(RwLock::new(store)),
-        }
+    pub fn new(config: Arc<config::Config>, store: Arc<RwLock<dyn db_store::Op>>) -> Server {
+        Server { config, store }
     }
 
     fn handle_client_connection(&self, mut stream: std::net::TcpStream) {
@@ -848,15 +844,26 @@ impl Server {
                     Err("Invalid PING command format".to_string())
                 }
             }
+            "CLIENT" => {
+                if let OwnedFrame::Array(arr) = frame {
+                    if arr.len() < 2 {
+                        return Err("(error) ERR wrong number of arguments for 'CLIENT' command"
+                            .to_string());
+                    }
+
+                    return Ok(OwnedFrame::SimpleString(b"OK".to_vec()));
+                } else {
+                    Err("Invalid CLIENT command format".to_string())
+                }
+            }
             // 其他命令处理
             _ => Err(format!("Unsupported command {:?}", command.as_str()).to_string()),
         }
     }
 
-    pub fn server_start(self: Arc<Self>) {
-        let (address, port) = self.config.get_addr_port();
-        let addr = format!("{}:{}", address, port);
-        let listener = TcpListener::bind(&addr).unwrap();
+    pub fn server_start(self: Arc<Self>) -> anyhow::Result<()> {
+        let addr = self.config.get_addr()?;
+        let listener = TcpListener::bind(&addr)?;
 
         println!("Listening on {}", addr);
 
@@ -875,19 +882,70 @@ impl Server {
                 }
             }
         }
+
+        Ok(())
     }
 }
 
-pub fn start_server(option: &Option<PathBuf>) -> anyhow::Result<()> {
+pub async fn start_server(option: &Option<PathBuf>) -> anyhow::Result<()> {
     let conf = if let Some(file) = option {
         config::Config::try_from(file.as_path())?
     } else {
         config::Config::new()?
     };
-
     debug!("{:?}", conf);
-    let srv = Server::new(conf);
+
+    // common core data
+    let the_config = Arc::new(conf);
+
+    let (tx, rx) = mpsc::channel();
+    let store = db_store::new_store(Arc::clone(&the_config), tx, rx);
+    let store = Arc::new(RwLock::new(store));
+
+    // joinset
+    let mut join_set = JoinSet::new();
+
+    // 使用 tokio::task::spawn_blocking 启动同步的 TCP 服务器
+    let store_clone = Arc::clone(&store);
+    let srv = Server::new(Arc::clone(&the_config), store_clone);
     let server = Arc::new(srv);
-    server.server_start();
+    // let tcp_handle = task::spawn_blocking(|| {
+    //     server.server_start();
+    // });
+
+    join_set.spawn(async {
+        // 使用 block_in_place 处理阻塞操作
+        tokio::task::block_in_place(|| {
+            server.server_start().unwrap();
+        });
+    });
+
+    // 添加 gRPC 服务器任务（如果配置存在）
+    if let Some(grpc_config) = the_config.get_grpc() {
+        let store_clone = Arc::clone(&store);
+        let addr = grpc_config.get_addr()?;
+        join_set.spawn(async move {
+            run_grpc_server(addr, store_clone).await.unwrap();
+        });
+    }
+
+    // 等待所有任务完成
+    while let Some(Ok(_)) = join_set.join_next().await {}
+
+    Ok(())
+}
+
+// gRPC server
+async fn run_grpc_server(
+    addr: SocketAddr,
+    store: Arc<RwLock<dyn db_store::Op>>,
+) -> anyhow::Result<()> {
+    println!("gRPC Server Listening on {:?}", addr);
+
+    tonic::transport::Server::builder()
+        .add_service(StoreServer::new(StoreImpl::new(store)))
+        .serve(addr)
+        .await?;
+
     Ok(())
 }
