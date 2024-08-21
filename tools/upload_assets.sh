@@ -2,7 +2,9 @@
 
 VERSION=$1
 
-#softname
+# repo
+REPO ="cfanbo/minkv"
+# softname
 NAME="minkv"
 
 # bucket name
@@ -21,7 +23,7 @@ for filename in "${LIST[@]}"
 do
     curl -fsSL -O \
         -H "Authorization: Bearer $GITHUB_TOKEN" \
-        https://github.com/cfanbo/minkv/releases/download/v"$VERSION"/"$filename"
+        https://github.com/"$REPO"/releases/download/v"$VERSION"/"$filename"
     shasum -a 256 "$filename" >> SHASUMS256.txt
 done
 
@@ -30,6 +32,7 @@ cat ./SHASUMS256.txt
 
 # install aliyun script
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/aliyun/aliyun-cli/HEAD/install.sh)"
+aliyun configure --profile default
 
 # upload assets
 FLAGS="${BUCKET}/ --force --access-key-id ${ACCESS_KEY_ID} --access-key-secret ${ACCESS_KEY_SECRET} --region cn-shanghai"

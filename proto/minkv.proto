@@ -11,6 +11,16 @@ service Store {
     rpc GetSet(GetSetRequest) returns (GetSetResponse);
     rpc MSet(MSetRequest) returns (MSetResponse);
     rpc MGet(MGetRequest) returns (MGetResponse);
+    rpc Append(AppendRequest) returns (AppendResponse);
+    rpc Incr(IncrRequest) returns (IncrResponse);
+    rpc Decr(DecrRequest) returns (DecrResponse);
+    rpc Expire(ExpireRequest) returns (ExpireResponse);
+    rpc ExpireAt(ExpireAtRequest) returns (ExpireAtResponse);
+    rpc PExpire(PExpireRequest) returns (PExpireResponse);
+    rpc PExpireAt(PExpireAtRequest) returns (PExpireAtResponse);
+    rpc Ttl(TtlRequest) returns (TtlResponse);
+    rpc PTtl(PTtlRequest) returns (PTtlResponse);
+    rpc Persist(PersistRequest) returns (PersistResponse);
 }
 
 // get
@@ -70,4 +80,86 @@ message MGetRequest{
 }
 message MGetResponse {
     repeated Item items = 1;
+}
+
+// append
+message AppendRequest {
+    string key = 1;
+    string value = 2;
+}
+message AppendResponse {
+    int32 len = 1;
+}
+
+// incr
+message IncrRequest {
+    string key = 1;
+}
+message IncrResponse {
+    int32 num = 1;
+}
+
+// decr
+message DecrRequest {
+    string key = 1;
+}
+message DecrResponse {
+    int32 num = 1;
+}
+
+// expire
+message ExpireRequest {
+    string key = 1;
+    int64 secs = 2;
+}
+message ExpireResponse {
+    int32 result = 1;
+}
+// expireat
+message ExpireAtRequest {
+    string key = 1;
+    int64 secs = 2;
+}
+message ExpireAtResponse {
+    int32 result = 1;
+}
+// pexire
+message PExpireRequest {
+    string key = 1;
+    int64 secs = 2;
+}
+message PExpireResponse {
+    int32 result = 1;
+}
+
+// PExpireAt
+message PExpireAtRequest {
+    string key = 1;
+    int64 secs = 2;
+}
+message PExpireAtResponse {
+    int32 result = 1;
+}
+
+// TtlRequest
+message TtlRequest {
+  string key = 1;
+}
+message TtlResponse {
+    int64 result = 1;
+}
+// PTtl
+message PTtlRequest {
+  string key = 1;
+}
+message PTtlResponse {
+    int64 result = 1;
+}
+
+// PersistRequest
+message PersistRequest{
+    string key = 1;
+}
+message PersistResponse {
+    int32 result = 1;
 }
