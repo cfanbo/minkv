@@ -21,7 +21,7 @@ for filename in "${LIST[@]}"
 do
     curl -fsSL -O \
         -H "Authorization: Bearer $GITHUB_TOKEN" \
-        https://github.com/cfanbo/ghactions/releases/download/v"$VERSION"/"$filename"
+        https://github.com/cfanbo/minkv/releases/download/v"$VERSION"/"$filename"
     shasum -a 256 "$filename" >> SHASUMS256.txt
 done
 
