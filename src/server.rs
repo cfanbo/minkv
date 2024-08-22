@@ -802,7 +802,11 @@ impl Server {
                     for v in store.keys() {
                         let v1 = String::from_utf8(v.to_vec()).unwrap();
                         if util::match_key(&k, &v1) {
-                            result.push(OwnedFrame::BulkString(v.clone()));
+                            if let Ok(entry) = store.get_entry(v.as_slice()) {
+                                if !entry.is_expired() {
+                                    result.push(OwnedFrame::BulkString(v.clone()));
+                                }
+                            }
                         }
                     }
                     Ok(OwnedFrame::Array(result))
