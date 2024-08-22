@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+set -e
 VERSION=$1
 
 # repo
@@ -32,6 +32,10 @@ cat ./SHASUMS256.txt
 
 # install aliyun script
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/aliyun/aliyun-cli/HEAD/install.sh)"
+
+aliyun configure set --profile default --mode AK --access-key-id ${ACCESS_KEY_ID} --access-key-secret ${ACCESS_KEY_SECRET} --region cn-shanghai
+aliyun configure switch --profile default
+aliyun configure list
 
 # upload assets
 FLAGS="${BUCKET}/ --force --access-key-id ${ACCESS_KEY_ID} --access-key-secret ${ACCESS_KEY_SECRET} --region cn-shanghai"
