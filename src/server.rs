@@ -75,7 +75,7 @@ impl Server {
 
     fn get_command_name(&self, frame: &OwnedFrame) -> Option<String> {
         if let OwnedFrame::Array(arr) = frame {
-            if let Some(OwnedFrame::BulkString(bulk)) = arr.get(0) {
+            if let Some(OwnedFrame::BulkString(bulk)) = arr.first() {
                 if let Ok(command) = std::str::from_utf8(bulk) {
                     return Some(command.to_string());
                 }
@@ -170,16 +170,11 @@ impl Server {
 
                     let store = self.store.read().unwrap();
                     for key in &arr[1..] {
-                        match key {
-                            OwnedFrame::BulkString(bulk) => {
-                                // 处理 BulkString 变体
-                                match store.get(bulk) {
-                                    Ok(_) => count = count + 1,
-                                    Err(_) => {}
-                                };
+                        if let OwnedFrame::BulkString(bulk) = key {
+                            // 处理 BulkString 变体
+                            if store.get(bulk).is_ok() {
+                                count += 1
                             }
-                            // 可以匹配其他变体
-                            _ => {}
                         }
                     }
 
@@ -256,15 +251,11 @@ impl Server {
 
                     let store = self.store.read().unwrap();
                     for key in &arr[1..] {
-                        match key {
-                            OwnedFrame::BulkString(bulk) => {
-                                // 处理 BulkString 变体
-                                match store.get(bulk) {
-                                    Ok(value) => result.push(OwnedFrame::BulkString(value)),
-                                    Err(_) => result.push(OwnedFrame::Null),
-                                };
-                            }
-                            _ => {}
+                        if let OwnedFrame::BulkString(bulk) = key {
+                            match store.get(bulk) {
+                                Ok(value) => result.push(OwnedFrame::BulkString(value)),
+                                Err(_) => result.push(OwnedFrame::Null),
+                            };
                         }
                     }
 
@@ -324,7 +315,7 @@ impl Server {
                             let s = String::from_utf8_lossy(&val);
                             match s.parse::<i64>() {
                                 Ok(mut n) => {
-                                    n = n + 1;
+                                    n += 1;
                                     store.set(key, &n.to_string().into_bytes(), 0);
                                     Ok(OwnedFrame::Integer(n))
                                 }
@@ -363,7 +354,7 @@ impl Server {
                             let s = String::from_utf8_lossy(&val);
                             match s.parse::<i64>() {
                                 Ok(mut n) => {
-                                    n = n - 1;
+                                    n -= 1;
                                     store.set(key, &n.to_string().into_bytes(), 0);
                                     Ok(OwnedFrame::Integer(n))
                                 }
@@ -399,7 +390,7 @@ impl Server {
                         _ => return Err("Invalid INCRBY command format".to_string()),
                     };
 
-                    let s = String::from_utf8_lossy(&num_str);
+                    let s = String::from_utf8_lossy(num_str);
                     let value = match s.parse::<i64>() {
                         Ok(value) => value,
                         Err(_) => {
@@ -416,7 +407,7 @@ impl Server {
                             let s = String::from_utf8_lossy(&val);
                             match s.parse::<i64>() {
                                 Ok(mut n) => {
-                                    n = n + value;
+                                    n += value;
                                     store.set(key, &n.to_string().into_bytes(), 0);
                                     Ok(OwnedFrame::Integer(n))
                                 }
@@ -452,7 +443,7 @@ impl Server {
                         _ => return Err("Invalid DECRBY command format".to_string()),
                     };
 
-                    let s = String::from_utf8_lossy(&num_str);
+                    let s = String::from_utf8_lossy(num_str);
                     let value = match s.parse::<i64>() {
                         Ok(value) => value,
                         Err(_) => {
@@ -469,7 +460,7 @@ impl Server {
                             let s = String::from_utf8_lossy(&val);
                             match s.parse::<i64>() {
                                 Ok(mut n) => {
-                                    n = n - value;
+                                    n -= value;
                                     store.set(key, &n.to_string().into_bytes(), 0);
                                     Ok(OwnedFrame::Integer(n))
                                 }
@@ -505,7 +496,7 @@ impl Server {
                         _ => return Err("Invalid EXPIRE command format".to_string()),
                     };
 
-                    let s = String::from_utf8_lossy(&num_str);
+                    let s = String::from_utf8_lossy(num_str);
                     let value = match s.parse::<u64>() {
                         Ok(value) => value,
                         Err(_) => {
@@ -555,7 +546,7 @@ impl Server {
                         _ => return Err("Invalid EXPIREAT command format".to_string()),
                     };
 
-                    let s = String::from_utf8_lossy(&num_str);
+                    let s = String::from_utf8_lossy(num_str);
                     let value = match s.parse::<u64>() {
                         Ok(value) => value,
                         Err(_) => {
@@ -605,7 +596,7 @@ impl Server {
                         _ => return Err("Invalid PEXPIRE command format".to_string()),
                     };
 
-                    let s = String::from_utf8_lossy(&num_str);
+                    let s = String::from_utf8_lossy(num_str);
                     let value = match s.parse::<u64>() {
                         Ok(value) => value,
                         Err(_) => {
@@ -655,7 +646,7 @@ impl Server {
                         _ => return Err("Invalid PEXPIREAT command format".to_string()),
                     };
 
-                    let s = String::from_utf8_lossy(&num_str);
+                    let s = String::from_utf8_lossy(num_str);
                     let value = match s.parse::<u64>() {
                         Ok(value) => value,
                         Err(_) => {
@@ -704,15 +695,12 @@ impl Server {
                             if entry.timestamp == 0 {
                                 // 未设置过期时间
                                 Ok(OwnedFrame::Integer(-1))
+                            } else if entry.is_expired() {
+                                Ok(OwnedFrame::Null)
                             } else {
-                                if entry.is_expired() {
-                                    Ok(OwnedFrame::Null)
-                                } else {
-                                    Ok(OwnedFrame::Integer(util::time::get_lifetime_sec(
-                                        entry.timestamp,
-                                    )
-                                        as i64))
-                                }
+                                Ok(OwnedFrame::Integer(
+                                    util::time::get_lifetime_sec(entry.timestamp) as i64,
+                                ))
                             }
                         }
                         Err(e) => {
@@ -743,15 +731,13 @@ impl Server {
                             if entry.timestamp == 0 {
                                 // 未设置过期时间
                                 Ok(OwnedFrame::Integer(-1))
+                            } else if entry.is_expired() {
+                                Ok(OwnedFrame::Null)
                             } else {
-                                if entry.is_expired() {
-                                    Ok(OwnedFrame::Null)
-                                } else {
-                                    Ok(OwnedFrame::Integer(util::time::get_lifetime_millisec(
-                                        entry.timestamp,
-                                    )
-                                        as i64))
-                                }
+                                Ok(OwnedFrame::Integer(util::time::get_lifetime_millisec(
+                                    entry.timestamp,
+                                )
+                                    as i64))
                             }
                         }
                         Err(e) => {
@@ -819,7 +805,7 @@ impl Server {
                             result.push(OwnedFrame::BulkString(v.clone()));
                         }
                     }
-                    return Ok(OwnedFrame::Array(result));
+                    Ok(OwnedFrame::Array(result))
                 } else {
                     Err("Invalid KEYS command format".to_string())
                 }
@@ -839,7 +825,7 @@ impl Server {
                         _ => return Err("Invalid PING command format".to_string()),
                     };
 
-                    return Ok(OwnedFrame::BulkString(key.to_vec()));
+                    Ok(OwnedFrame::BulkString(key.to_vec()))
                 } else {
                     Err("Invalid PING command format".to_string())
                 }
@@ -851,7 +837,7 @@ impl Server {
                             .to_string());
                     }
 
-                    return Ok(OwnedFrame::SimpleString(b"OK".to_vec()));
+                    Ok(OwnedFrame::SimpleString(b"OK".to_vec()))
                 } else {
                     Err("Invalid CLIENT command format".to_string())
                 }
@@ -863,7 +849,7 @@ impl Server {
 
     pub fn server_start(self: Arc<Self>) -> anyhow::Result<()> {
         let addr = self.config.get_addr()?;
-        let listener = TcpListener::bind(&addr)?;
+        let listener = TcpListener::bind(addr)?;
 
         println!("Listening on {}", addr);
 

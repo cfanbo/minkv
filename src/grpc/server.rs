@@ -72,7 +72,7 @@ impl Store for StoreImpl {
         debug!("gRPC Got a request: {:?}", request);
 
         let req = request.into_inner();
-        if req.keys.len() < 1 {
+        if req.keys.is_empty() {
             return Err(Status::new(tonic::Code::DataLoss, "key loss"));
         }
 
@@ -90,7 +90,7 @@ impl Store for StoreImpl {
             }
         }
 
-        if keys.len() > 0 {
+        if !keys.is_empty() {
             let mut store = self.store.write().unwrap();
             for k in keys {
                 store.delete(&k);
@@ -107,7 +107,7 @@ impl Store for StoreImpl {
         debug!("gRPC Got a request: {:?}", request);
 
         let req = request.into_inner();
-        if req.keys.len() < 1 {
+        if req.keys.is_empty() {
             return Err(Status::new(tonic::Code::DataLoss, "key loss"));
         }
 
@@ -151,7 +151,7 @@ impl Store for StoreImpl {
     async fn m_set(&self, request: Request<MSetRequest>) -> Result<Response<MSetResponse>, Status> {
         debug!("gRPC Got a request: {:?}", request);
         let req = request.into_inner();
-        if req.items.len() == 0 {
+        if req.items.is_empty() {
             return Err(Status::new(
                 tonic::Code::InvalidArgument,
                 "argument invalid",
@@ -174,7 +174,7 @@ impl Store for StoreImpl {
         debug!("gRPC Got a request: {:?}", request);
 
         let req = request.into_inner();
-        if req.keys.len() < 1 {
+        if req.keys.is_empty() {
             return Err(Status::new(tonic::Code::DataLoss, "key loss"));
         }
 
@@ -185,14 +185,14 @@ impl Store for StoreImpl {
                 let k = key.as_bytes().to_vec();
                 if let Ok(value) = store.get(&k) {
                     items.push(Item {
-                        key: key,
+                        key,
                         value: String::from_utf8(value).unwrap(),
                     });
                 }
             }
         }
 
-        Ok(Response::new(MGetResponse { items: items }))
+        Ok(Response::new(MGetResponse { items }))
     }
 
     async fn append(
@@ -238,7 +238,7 @@ impl Store for StoreImpl {
                 let s = String::from_utf8_lossy(&val);
                 match s.parse::<i64>() {
                     Ok(mut n) => {
-                        n = n + 1;
+                        n += 1;
                         store.set(&key, &n.to_string().into_bytes(), 0);
                         Ok(Response::new(IncrResponse { num: n as i32 }))
                     }
@@ -266,7 +266,7 @@ impl Store for StoreImpl {
                 let s = String::from_utf8_lossy(&val);
                 match s.parse::<i64>() {
                     Ok(mut n) => {
-                        n = n - 1;
+                        n -= 1;
                         store.set(&key, &n.to_string().into_bytes(), 0);
                         Ok(Response::new(DecrResponse { num: n as i32 }))
                     }
@@ -392,14 +392,12 @@ impl Store for StoreImpl {
                 if entry.timestamp == 0 {
                     // 未设置过期时间
                     Ok(Response::new(TtlResponse { result: -1 }))
+                } else if entry.is_expired() {
+                    Err(Status::new(tonic::Code::NotFound, "NotFound"))
                 } else {
-                    if entry.is_expired() {
-                        Err(Status::new(tonic::Code::NotFound, "NotFound"))
-                    } else {
-                        Ok(Response::new(TtlResponse {
-                            result: util::time::get_lifetime_sec(entry.timestamp) as i64,
-                        }))
-                    }
+                    Ok(Response::new(TtlResponse {
+                        result: util::time::get_lifetime_sec(entry.timestamp) as i64,
+                    }))
                 }
 
                 // Ok(Response::new(TtlResponse{result: 1 }))
@@ -420,14 +418,12 @@ impl Store for StoreImpl {
                 if entry.timestamp == 0 {
                     // 未设置过期时间
                     Ok(Response::new(PTtlResponse { result: -1 }))
+                } else if entry.is_expired() {
+                    Err(Status::new(tonic::Code::NotFound, "NotFound"))
                 } else {
-                    if entry.is_expired() {
-                        Err(Status::new(tonic::Code::NotFound, "NotFound"))
-                    } else {
-                        Ok(Response::new(PTtlResponse {
-                            result: util::time::get_lifetime_millisec(entry.timestamp) as i64,
-                        }))
-                    }
+                    Ok(Response::new(PTtlResponse {
+                        result: util::time::get_lifetime_millisec(entry.timestamp) as i64,
+                    }))
                 }
             }
             Err(_) => Err(Status::new(tonic::Code::NotFound, "NotFound")),

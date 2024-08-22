@@ -11,6 +11,7 @@ impl Locker {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(file_path)?;
 
         // 尝试获取独占锁

@@ -40,7 +40,7 @@ pub fn get_files_in_directory(path: &Path) -> Result<Vec<PathBuf>, std::io::Erro
     Ok(file_list)
 }
 
-pub fn filter_file(file_path: &PathBuf, prefix: &str, ext: &str) -> bool {
+pub fn filter_file(file_path: PathBuf, prefix: &str, ext: &str) -> bool {
     // 检查文件名前缀
     if let Some(file_name) = file_path.file_stem() {
         if let Some(file_name_str) = file_name.to_str() {
@@ -64,7 +64,7 @@ pub fn filter_file(file_path: &PathBuf, prefix: &str, ext: &str) -> bool {
     true
 }
 
-pub fn parse_seq_from_filename(filename: &PathBuf) -> usize {
+pub fn parse_seq_from_filename(filename: PathBuf) -> usize {
     let main_filename = filename.file_stem().unwrap().to_string_lossy();
 
     // 提取数字部分

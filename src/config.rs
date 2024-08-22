@@ -39,7 +39,7 @@ impl TryFrom<&Path> for FileConfig {
 
         if let Some(server) = &config.server {
             if let Some(address) = &server.address {
-                if !address.parse::<IpAddr>().is_ok() {
+                if address.parse::<IpAddr>().is_err() {
                     return Err(Error::new(
                         ErrorKind::AddrNotAvailable,
                         "server address invalid".to_string(),
@@ -49,7 +49,7 @@ impl TryFrom<&Path> for FileConfig {
             }
 
             if let Some(port) = server.port {
-                if port < 1 || port > 65535 {
+                if !(1..=65535).contains(&port) {
                     return Err(Error::new(
                         ErrorKind::InvalidData,
                         format!("invalid port {}", port).to_string(),
@@ -61,7 +61,7 @@ impl TryFrom<&Path> for FileConfig {
 
         if let Some(server) = &config.grpc {
             if let Some(address) = &server.address {
-                if !address.parse::<IpAddr>().is_ok() {
+                if address.parse::<IpAddr>().is_err() {
                     return Err(Error::new(
                         ErrorKind::AddrNotAvailable,
                         "server address invalid".to_string(),
@@ -71,7 +71,7 @@ impl TryFrom<&Path> for FileConfig {
             }
 
             if let Some(port) = server.port {
-                if port < 1 || port > 65535 {
+                if !(1..65535).contains(&port) {
                     return Err(Error::new(
                         ErrorKind::InvalidData,
                         format!("invalid port {}", port).to_string(),
@@ -199,7 +199,7 @@ impl Config {
         {
             let path = self.data_dir();
             if !path.exists() {
-                fs::create_dir_all(path).expect(&format!("Failed to create directory: {:?}", path));
+                fs::create_dir_all(path).unwrap_or_else(|_| panic!("Failed to create directory: {:?}", path));
             }
         }
 
@@ -207,8 +207,7 @@ impl Config {
         {
             let path = self.merge_dir();
             if !path.exists() {
-                fs::create_dir_all(&path)
-                    .expect(&format!("Failed to create directory: {:?}", path));
+                fs::create_dir_all(&path).unwrap_or_else(|_| panic!("Failed to create directory: {:?}", path));
             }
             fs::remove_dir_all(path).unwrap();
         }

@@ -8,7 +8,6 @@ use std::sync::{Arc, RwLock};
 pub fn new(filepath: &PathBuf) -> io::Result<File> {
     let file = fs::OpenOptions::new()
         .read(true)
-        .write(true)
         .create(true)
         .append(true)
         .open(filepath);
@@ -19,7 +18,6 @@ pub fn new(filepath: &PathBuf) -> io::Result<File> {
 pub fn new_writer(filepath: &PathBuf) -> io::Result<io::BufWriter<File>> {
     let f = fs::OpenOptions::new()
         .read(true)
-        .write(true)
         .create(true)
         .append(true)
         .open(filepath)?;
@@ -41,7 +39,7 @@ pub fn read(file: &Arc<RwLock<File>>, offset: u64, size: u64) -> io::Result<Vec<
     let mut buf = vec![0; size as usize];
     let mut file = file.write().unwrap();
     file.seek(SeekFrom::Start(offset))?;
-    let _ = file.read_exact(&mut buf)?;
+    file.read_exact(&mut buf)?;
 
     Ok(buf)
 }
@@ -54,7 +52,7 @@ pub fn read_reader(
     let mut buf = vec![0; size as usize];
     let mut file = file.write().unwrap();
     file.seek(SeekFrom::Start(offset))?;
-    let _ = file.read_exact(&mut buf)?;
+    file.read_exact(&mut buf)?;
 
     Ok(buf)
 }

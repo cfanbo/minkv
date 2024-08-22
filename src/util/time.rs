@@ -1,11 +1,11 @@
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 // 获取当前时间的毫秒时间戳
 pub fn current_milliseconds() -> u64 {
     let now = SystemTime::now();
     let duration_since_epoch = now
         .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or(Duration::default());
+        .unwrap_or_default();
     duration_since_epoch.as_millis() as u64
 }
 

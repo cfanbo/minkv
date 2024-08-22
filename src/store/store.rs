@@ -17,17 +17,19 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex, RwLock};
 
 pub trait Op: Send + Sync + 'static {
-    fn get(&self, key: &Vec<u8>) -> Result<Vec<u8>, OpError>;
-    fn get_entry(&self, key: &Vec<u8>) -> Result<Entry, OpError>;
-    fn set(&mut self, key: &Vec<u8>, value: &Vec<u8>, timestamp: u64);
-    fn delete(&mut self, key: &Vec<u8>);
+    fn get(&self, key: &[u8]) -> Result<Vec<u8>, OpError>;
+    fn get_entry(&self, key: &[u8]) -> Result<Entry, OpError>;
+    fn set(&mut self, key: &[u8], value: &[u8], timestamp: u64);
+    fn delete(&mut self, key: &[u8]);
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
     fn keys(&self) -> Vec<Vec<u8>>;
     fn compaction(&mut self);
 }
 
 const ACTIVE_FILE_SEQ: u16 = 0;
 type StFile = Arc<RwLock<BufReader<File>>>; // storage File
+type ReaderFile = Arc<RwLock<File>>;
 type NotifyResult = i32;
 
 pub struct Store<K>
@@ -35,7 +37,7 @@ where
     // K: OpKeydir,
     K: OpKeydir + Send + Sync + 'static,
 {
-    active_file: Arc<RwLock<File>>,
+    active_file: ReaderFile,
     config: Arc<config::Config>,
     keydir: Arc<RwLock<K>>,
     files: Arc<RwLock<HashMap<u16, StFile>>>,
@@ -241,7 +243,7 @@ where
         self_keydir.extend(keydir.data);
     }
 
-    fn get_fd(&self, seq: u16) -> Result<(Option<Arc<RwLock<File>>>, Option<StFile>), OpError> {
+    fn get_fd(&self, seq: u16) -> Result<(Option<ReaderFile>, Option<StFile>), OpError> {
         if seq == ACTIVE_FILE_SEQ {
             return Ok((Some(Arc::clone(&self.active_file)), None));
         }
@@ -272,7 +274,7 @@ where
             self.merge_file_num.store(0, Ordering::SeqCst);
 
             // Avoiding duplicate merges caused by generating new files too quickly
-            if let Ok(_) = lock::Locker::acquire() {
+            if lock::Locker::acquire().is_ok() {
                 self.sender.send(0).unwrap();
             } else {
                 debug!("发现 lock 文件，正在合并中...");
@@ -326,7 +328,7 @@ where
                 active_file: Arc<RwLock<File>>,
                 files: Arc<RwLock<HashMap<u16, StFile>>>,
                 seq: u16,
-            ) -> Result<(Option<Arc<RwLock<File>>>, Option<StFile>), OpError> {
+            ) -> Result<(Option<ReaderFile>, Option<StFile>), OpError> {
                 if seq == ACTIVE_FILE_SEQ {
                     return Ok((Some(active_file), None));
                 }
@@ -466,7 +468,7 @@ where
                 merge_hint_file_fd.flush().unwrap();
 
                 // move
-                if merge_keydir.data.len() > 0 {
+                if !merge_keydir.data.is_empty() {
                     // delete old datafiles
                     let mut files = files.write().unwrap();
                     for i in files.keys() {
@@ -524,7 +526,7 @@ where
 
 impl<K: OpKeydir> Op for Store<K> {
     // get
-    fn get(&self, key: &Vec<u8>) -> Result<Vec<u8>, OpError> {
+    fn get(&self, key: &[u8]) -> Result<Vec<u8>, OpError> {
         let self_keydir = self.keydir.read().unwrap();
         if let Ok(metadata) = self_keydir.get(key) {
             debug!("key:{:?}  {:?}", key, metadata);
@@ -571,7 +573,7 @@ impl<K: OpKeydir> Op for Store<K> {
         Err(OpError::KeyNotFound)
     }
 
-    fn get_entry(&self, key: &Vec<u8>) -> Result<Entry, OpError> {
+    fn get_entry(&self, key: &[u8]) -> Result<Entry, OpError> {
         let self_keydir = self.keydir.read().unwrap();
         if let Ok(metadata) = self_keydir.get(key) {
             debug!("key:{:?}  {:?}", key, metadata);
@@ -617,12 +619,12 @@ impl<K: OpKeydir> Op for Store<K> {
     }
 
     // set/put
-    fn set(&mut self, key: &Vec<u8>, value: &Vec<u8>, timestamp: u64) {
+    fn set(&mut self, key: &[u8], value: &[u8], timestamp: u64) {
         debug!(
             "set key:{:?}, value:{:?}, timestamp: {}",
             key, value, timestamp
         );
-        let entry = entry::Entry::new(key.clone(), value.clone(), timestamp);
+        let entry = entry::Entry::new(key.to_vec(), value.to_vec(), timestamp);
 
         // 文件大小分割
         if self.get_filesize() + entry.size() > self.config.file_max_size() {
@@ -656,11 +658,11 @@ impl<K: OpKeydir> Op for Store<K> {
     }
 
     // delete
-    fn delete(&mut self, key: &Vec<u8>) {
+    fn delete(&mut self, key: &[u8]) {
         // 先检查是否存在，否则直接返回
         // self.set(key, &b"".to_vec());
         let value: Vec<u8> = vec![];
-        let entry = entry::Entry::new(key.clone(), value, 0).set_removed();
+        let entry = entry::Entry::new(key.to_vec(), value, 0).set_removed();
         debug!("delete {:?}", entry);
         self.file_size.fetch_add(entry.size(), Ordering::SeqCst);
         let (_, _) = file::append(&self.active_file, entry);
@@ -680,6 +682,10 @@ impl<K: OpKeydir> Op for Store<K> {
     // len
     fn len(&self) -> usize {
         self.keydir.read().unwrap().len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.keydir.read().unwrap().is_empty()
     }
 
     fn keys(&self) -> Vec<Vec<u8>> {
@@ -811,7 +817,7 @@ impl<K: OpKeydir> Op for Store<K> {
         merge_hint_file_fd.flush().unwrap();
 
         // move
-        if merge_keydir.data.len() > 0 {
+        if !merge_keydir.data.is_empty() {
             // delete old datafiles
             let mut files = self.files.write().unwrap();
             for i in files.keys() {
@@ -872,13 +878,13 @@ pub struct Keydir {
 }
 
 pub trait OpKeydir: Sync + Send {
-    fn new() -> Keydir;
-    fn get(&self, key: &Vec<u8>) -> Result<Metadata, OpError>;
+    fn new() -> Self;
+    fn get(&self, key: &[u8]) -> Result<Metadata, OpError>;
 
-    fn set(&mut self, key: &Vec<u8>, metadata: Metadata);
-    fn remove(&mut self, key: &Vec<u8>);
+    fn set(&mut self, key: &[u8], metadata: Metadata);
+    fn remove(&mut self, key: &[u8]);
     fn len(&self) -> usize;
-
+    fn is_empty(&self) -> bool;
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = (Vec<u8>, Metadata)>;
@@ -899,20 +905,24 @@ impl OpKeydir for Keydir {
     fn iter(&self) -> Iter<Vec<u8>, Metadata> {
         self.data.iter()
     }
-    fn get(&self, key: &Vec<u8>) -> Result<Metadata, OpError> {
+    fn get(&self, key: &[u8]) -> Result<Metadata, OpError> {
         self.data.get(key).cloned().ok_or(OpError::KeyNotFound)
     }
 
-    fn set(&mut self, key: &Vec<u8>, metadata: Metadata) {
-        self.data.insert(key.clone(), metadata);
+    fn set(&mut self, key: &[u8], metadata: Metadata) {
+        self.data.insert(key.to_vec(), metadata);
     }
 
-    fn remove(&mut self, key: &Vec<u8>) {
+    fn remove(&mut self, key: &[u8]) {
         self.data.remove(key);
     }
 
     fn len(&self) -> usize {
         self.data.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 
     fn keys(&self) -> Vec<&Vec<u8>> {
