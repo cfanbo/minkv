@@ -38,7 +38,7 @@ aliyun configure switch --profile default
 aliyun configure list
 
 # upload assets
-FLAGS="${BUCKET}/ --force --access-key-id ${ACCESS_KEY_ID} --access-key-secret ${ACCESS_KEY_SECRET} --region cn-shanghai"
+FLAGS="${BUCKET}/ --force"
 echo $LFLAGS
 for filename in "${LIST[@]}"
 do
@@ -53,5 +53,5 @@ do
 
     file="${filename/v$VERSION/latest}"
     latest="${BUCKET}/${file}"
-    aliyun oss create-symlink $latest $origin_name --region cn-shanghai
+    aliyun oss create-symlink $latest $origin_name
 done
