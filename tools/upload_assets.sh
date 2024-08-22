@@ -3,7 +3,7 @@
 VERSION=$1
 
 # repo
-REPO ="cfanbo/minkv"
+REPO="cfanbo/minkv"
 # softname
 NAME="minkv"
 
