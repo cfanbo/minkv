@@ -75,10 +75,83 @@ pub struct EntryParseResult {
     pub entry: Entry,
 }
 
-pub struct EntryFile(File);
+pub struct EntryFile(File, usize);
 impl EntryFile {
     pub fn new(file: File) -> EntryFile {
-        EntryFile(file)
+        EntryFile(file, 0)
+    }
+}
+
+// Iterator
+impl Iterator for EntryFile {
+    type Item = EntryParseResult;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let header_size = Entry::default().header_size();
+        let mut buffer = vec![0; header_size];
+
+        if self.0.read_exact(&mut buffer).is_ok() {
+            let crc = u32::from_le_bytes(
+                buffer[..4]
+                    .try_into()
+                    .map_err(|_| "Invalid CRC data")
+                    .unwrap(),
+            );
+            let timestamp = u64::from_le_bytes(
+                buffer[4..12]
+                    .try_into()
+                    .map_err(|_| "Invalid timestamp data")
+                    .unwrap(),
+            );
+            let key_size = u32::from_le_bytes(
+                buffer[12..16]
+                    .try_into()
+                    .map_err(|_| "Invalid key_size data")
+                    .unwrap(),
+            );
+            let value_size = u64::from_le_bytes(
+                buffer[16..24]
+                    .try_into()
+                    .map_err(|_| "Invalid value_size data")
+                    .unwrap(),
+            );
+
+            let op = Op::from_le_bytes(
+                buffer[24..25]
+                    .try_into()
+                    .map_err(|_| "Invalid value_size data")
+                    .unwrap(),
+            )
+            .unwrap();
+
+            // key
+            let mut key = vec![0; key_size as usize];
+            self.0.read_exact(&mut key).unwrap();
+
+            // value
+            let mut value = vec![0; value_size as usize];
+            self.0.read_exact(&mut value).unwrap();
+
+            let entry = Entry {
+                crc,
+                timestamp,
+                key_size,
+                value_size,
+                op,
+                key,
+                value,
+            };
+
+            let result = EntryParseResult {
+                value_pos: self.1 as u64,
+                entry,
+            };
+            self.1 += header_size + key_size as usize + value_size as usize;
+
+            Some(result)
+        } else {
+            None
+        }
     }
 }
 
@@ -540,5 +613,19 @@ mod tests {
         assert_eq!(e_timestamp, ins.timestamp);
         assert_eq!(op, ins.op);
         assert!(ins.is_valid());
+    }
+
+    #[test]
+    fn entry_file_iterator() {
+        use super::*;
+        use crate::store::file;
+
+        let path = std::path::PathBuf::from("/Users/sxf/workspace/rust/minkv/dbdata/mysql");
+        let file = file::open(&path).unwrap();
+        let mut entry_file = EntryFile::new(file);
+
+        while let Some(entry_result) = entry_file.next() {
+            println!("{:?}", entry_result);
+        }
     }
 }

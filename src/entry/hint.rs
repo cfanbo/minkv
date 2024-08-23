@@ -70,6 +70,59 @@ impl fmt::Debug for Hint {
     }
 }
 
+// Iterator
+impl Iterator for HintFile {
+    type Item = Hint;
+    
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut buffer = vec![0; 28];
+        if self.0.read_exact(&mut buffer).is_ok() {
+            let timestamp = u64::from_le_bytes(
+                buffer[0..8]
+                    .try_into()
+                    .map_err(|_| "Invalid timestamp data")
+                    .unwrap(),
+            );
+            let key_size = u32::from_le_bytes(
+                buffer[8..12]
+                    .try_into()
+                    .map_err(|_| "Invalid key_size data")
+                    .unwrap(),
+            );
+            let value_size = u64::from_le_bytes(
+                buffer[12..20]
+                    .try_into()
+                    .map_err(|_| "Invalid value_size data")
+                    .unwrap(),
+            );
+
+            // value_pos
+            let value_pos = u64::from_le_bytes(
+                buffer[20..28]
+                    .try_into()
+                    .map_err(|_| "Invalid value_size data")
+                    .unwrap(),
+            );
+
+            // key 再次读取指定长度的字节
+            let mut key = vec![0; key_size as usize];
+            self.0.read_exact(&mut key).unwrap();
+
+            let hint = Hint {
+                timestamp,
+                key_size,
+                value_size,
+                value_pos,
+                key,
+            };
+            
+            Some(hint)
+        } else {
+            None
+        }
+    }
+}
+
 impl From<HintFile> for Vec<Hint> {
     fn from(mut val: HintFile) -> Self {
         let mut buffer = vec![0; 28];
