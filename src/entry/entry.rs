@@ -75,6 +75,10 @@ impl EntryFile {
     pub fn new(file: File) -> EntryFile {
         EntryFile(file, 0)
     }
+
+    pub fn iter(&mut self) -> &mut Self {
+        self
+    }
 }
 
 // Iterator

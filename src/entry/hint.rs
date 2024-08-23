@@ -34,6 +34,10 @@ impl HintFile {
     pub fn new(file: File) -> HintFile {
         HintFile(file)
     }
+    
+    pub fn iter(&mut self) -> &mut Self {
+        self
+    }
 }
 
 fn format_bytes_as_str(bytes: &[u8]) -> String {
