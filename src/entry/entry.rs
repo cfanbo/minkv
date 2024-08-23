@@ -496,18 +496,4 @@ mod tests {
         assert_eq!(op, ins.op);
         assert!(ins.is_valid());
     }
-
-    #[test]
-    fn entry_file_iterator() {
-        use super::*;
-        use crate::store::file;
-
-        let path = std::path::PathBuf::from("/Users/sxf/workspace/rust/minkv/dbdata/mysql");
-        let file = file::open(&path).unwrap();
-        let mut entry_file = EntryFile::new(file);
-
-        while let Some(entry_result) = entry_file.next() {
-            println!("{:?}", entry_result);
-        }
-    }
 }
