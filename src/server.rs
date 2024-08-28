@@ -30,7 +30,7 @@ impl Server {
         Server { config, store }
     }
 
-    fn handle_client_connection(&self, mut stream: std::net::TcpStream) {
+    async fn handle_client_connection(&self, mut stream: std::net::TcpStream) {
         let mut buffer = [0u8; 4096];
 
         loop {
@@ -863,8 +863,8 @@ impl Server {
                     debug!("New connection: {}", stream.peer_addr().unwrap());
                     let server_clone = Arc::clone(&self);
 
-                    std::thread::spawn(move || {
-                        server_clone.handle_client_connection(stream);
+                    tokio::spawn(async move {
+                        server_clone.handle_client_connection(stream).await;
                     });
                 }
                 Err(e) => {

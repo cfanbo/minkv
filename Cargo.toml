@@ -19,10 +19,16 @@ tempfile = "3.12.0"
 clap = { version = "4.5.10", features = ["derive"] }
 redis-protocol = { version = "5.0.1", features = ["std", "codec"] }
 fs2 = "0.4.3"
-tokio = { version = "1.39.3", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.39.3", features = [
+    "macros",
+    "rt-multi-thread",
+    "tracing",
+] }
 tonic = "0.12.1"
 prost = "0.13.1"
 tonic-reflection = "0.12.1"
+console-subscriber = "0.4.0"
+tracing = "0.1.40"
 
 [build-dependencies]
 anyhow = "1.0.86"
