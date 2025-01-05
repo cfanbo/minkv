@@ -105,7 +105,7 @@ Listening on 127.0.0.1:6381
 - persist
 - keys
 
-以上用户完全与 redis 用法一样。
+以上语法完全与 redis 保持一致。
 
 # 备份与恢复
 
